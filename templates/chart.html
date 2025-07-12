@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Smart Grid Chart</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <h1>Smart Grid: Weather & Energy Chart</h1>
+
+    <canvas id="myChart" width="800" height="400"></canvas>
+
+    <br>
+    <a href="/static/data_log.csv" download>
+        <button>📥 Download CSV Data</button>
+    </a>
+
+    <script>
+        function fetchAndDrawChart() {
+            fetch("/data")
+                .then(res => {
+                    if (!res.ok) {
+                        throw new Error(`HTTP error! status: ${res.status}`);
+                    }
+                    return res.json();
+                })
+                .then(data => {
+                    if (!data || data.length === 0) {
+                        console.warn("No data available for chart.");
+                        return;
+                    }
+
+                    const labels = data.map(d => d.timestamp);
+                    const temperature = data.map(d => parseFloat(d.temperature));
+                    const solar = data.map(d => {
+                        const val = parseFloat(d.solar_radiation);
+                        return isNaN(val) ? 0 : val; // Default to 0 if solar_radiation is not a valid number
+                    });
+                    const demand = data.map(d => {
+                        let temp = parseFloat(d.temperature);
+                        let hum = parseFloat(d.humidity);
+                        let load = 100;
+                        if (temp > 30) load += (temp - 30) * 5;
+                        if (hum > 70) load += 10;
+                        return load;
+                    });
+
+                    const ctx = document.getElementById('myChart').getContext('2d');
+
+                    if (window.myChart) {
+                        window.myChart.data.labels = labels;
+                        window.myChart.data.datasets[0].data = temperature;
+                        window.myChart.data.datasets[1].data = solar;
+                        window.myChart.data.datasets[2].data = demand;
+                        window.myChart.update();
+                    } else {
+                        window.myChart = new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: labels,
+                                datasets: [
+                                    {
+                                        label: 'Temperature (°C)',
+                                        data: temperature,
+                                        borderColor: 'red',
+                                        fill: false
+                                    },
+                                    {
+                                        label: 'Solar Radiation (W/m²)',
+                                        data: solar,
+                                        borderColor: 'orange',
+                                        fill: false
+                                    },
+                                    {
+                                        label: 'Estimated Demand (kW)',
+                                        data: demand,
+                                        borderColor: 'blue',
+                                        fill: false
+                                    }
+                                ]
+                            },
+                            options: {
+                                responsive: true,
+                                scales: {
+                                    x: {
+                                        title: { display: true, text: 'Time' }
+                                    },
+                                    y: {
+                                        title: { display: true, text: 'Value' }
+                                    }
+                                }
+                            }
+                        });
+                    }
+                })
+                .catch(err => {
+                    console.error("Chart Fetch Error:", err);
+                    alert("Failed to load chart data. Please check the console for more details.");
+                });
+        }
+
+        fetchAndDrawChart();
+        setInterval(fetchAndDrawChart, 60000);
+    </script>
+</body>
+</html>
